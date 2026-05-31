@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>利回りウォッチャー | 高配当株監視ダッシュボード</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 追加のカスタムスタイル（目標利回り・バッジ対応） */
+        .register-form {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .yield-input-group {
+            max-width: 150px;
+        }
+
+        /* 目標達成時のプレミアムカードスタイル */
+        .stock-card.target-achieved {
+            border: 1px solid rgba(52, 211, 153, 0.45);
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9) 0%, rgba(16, 24, 48, 0.95) 100%);
+            box-shadow: 0 0 15px rgba(52, 211, 153, 0.08);
+        }
+
+        /* 目標達成バッジ */
+        .achieved-badge {
+            background: rgba(52, 211, 153, 0.12);
+            color: #34d399;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% { border-color: rgba(52, 211, 153, 0.25); }
+            50% { border-color: rgba(52, 211, 153, 0.5); }
+            100% { border-color: rgba(52, 211, 153, 0.25); }
+        }
+
+        /* カード内の目標利回り調整行 */
+        .card-target-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed rgba(255, 255, 255, 0.08);
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .target-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .input-card-target {
+            width: 55px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            color: #fff;
+            padding: 0.15rem 0.35rem;
+            font-size: 0.8rem;
+            text-align: right;
+            outline: none;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .input-card-target:focus {
+            border-color: #34d399;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        /* Chrome, Safari, Edge, Opera のスピンボタンを非表示にする */
+        .input-card-target::-webkit-outer-spin-button,
+        .input-card-target::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Firefox のスピンボタンを非表示にする */
+        .input-card-target {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダーセクション -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-area">
+                    <i data-lucide="trending-up" class="logo-icon"></i>
+                    <h1 class="app-title">利回りウォッチャー</h1>
+                </div>
+                <p class="app-subtitle">日本株・高配当銘柄 リアルタイム監視ダッシュボード</p>
+            </div>
+            
+            <div class="header-right">
+                <!-- 統計情報サマリー -->
+                <div class="summary-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">監視銘柄数</span>
+                        <span id="stat-count" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">平均配当利回り</span>
+                        <span id="stat-average-yield" class="stat-value">0.00%</span>
+                    </div>
+                </div>
+                <!-- 設定ボタン -->
+                <button id="btn-open-settings" class="btn btn-icon" title="環境設定" aria-label="環境設定を開く">
+                    <i data-lucide="settings"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="app-main">
+            <!-- アクションエリア（登録・更新） -->
+            <section class="action-bar">
+                <form id="form-register-stock" class="register-form">
+                    <div class="input-group">
+                        <i data-lucide="search" class="input-icon"></i>
+                        <!-- バリデーションパターンをアルファベット混じり(4〜5桁)に対応化 -->
+                        <input type="text" id="input-stock-code" placeholder="銘柄コードを入力 (例: 2914, 135A)" maxlength="5" pattern="^[A-Za-z0-9]{4,5}$" required autocomplete="off">
+                    </div>
+                    <div class="input-group yield-input-group">
+                        <i data-lucide="target" class="input-icon"></i>
+                        <input type="number" id="input-target-yield" placeholder="目標利回り" step="0.1" min="0" max="100" value="4.0" required autocomplete="off">
+                        <span style="color: #64748b; font-size: 0.85rem; padding-right: 0.75rem;">%</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="plus-circle"></i>
+                        <span>銘柄を登録</span>
+                    </button>
+                </form>
+                <div class="action-buttons">
+                    <button id="btn-refresh-all" class="btn btn-secondary">
+                        <i data-lucide="refresh-cw" id="refresh-icon"></i>
+                        <span>一括更新</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ダッシュボードグリッド -->
+            <section class="dashboard-grid" id="stock-cards-container">
+                <!-- JavaScriptで動的にカードが挿入されます -->
+                <div id="empty-state" class="empty-state">
+                    <i data-lucide="database" class="empty-icon"></i>
+                    <h3>監視対象の銘柄がありません</h3>
+                    <p>上の入力欄に4桁または5桁の銘柄コード（135A等アルファベット混じり対応）を入力して登録してください。</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- フッター -->
+        <footer class="app-footer">
+            <p>&copy; 2026 利回りウォッチャー. All Rights Reserved.</p>
+        </footer>
+    </div>
+
+    <!-- 環境設定モーダル -->
+    <div id="settings-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i data-lucide="sliders" class="modal-title-icon"></i>環境設定</h2>
+                <button id="btn-close-modal" class="btn btn-icon btn-close" aria-label="閉じる">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="input-api-url" class="form-label">
+                        APIベースURL (Vercel/Render用)
+                        <span class="required-badge">必須</span>
+                    </label>
+                    <input type="url" id="input-api-url" class="form-control" placeholder="https://your-api.render.com/api/stock" required>
+                    <p class="form-help">
+                        株価データを取得する外部APIのURLを入力してください。<br>
+                        例: <code>https://xxx.render.com/api/stock</code><br>
+                        リクエスト時は末尾に <code>?code=銘柄コード</code> が付与されます。
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-settings" class="btn btn-secondary">キャンセル</button>
+                <button id="btn-save-settings" class="btn btn-primary">設定を保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Lucide Icons の初期化
+        lucide.createIcons();
+    </script>
+</body>
+</html>
