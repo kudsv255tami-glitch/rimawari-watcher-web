@@ -1,5 +1,5 @@
 /**
- * 利回りウォッチャー - アプリケーションロジック（完全版・1株配当手入力対応）
+ * 利回りウォッチャー - アプリケーションロジック（完全版・1株配当手入力対応・利回り完全自動再計算版）
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -262,20 +262,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const dividendInput = card.querySelector('.input-card-dividend');
         
         let currentDividend = 0;
-        let currentYield = 0;
 
         if (stockConfig && stockConfig.manualDividend !== null) {
             // 1株配当に「手入力値」がある場合
             currentDividend = stockConfig.manualDividend;
             if (dividendInput) dividendInput.value = currentDividend;
             card.classList.add('manual-mode');
-            
-            // 手入力の配当金と、現在の取得株価を使って利回りを自動連動計算
-            if (priceVal > 0) {
-                currentYield = (currentDividend / priceVal) * 100;
-            } else {
-                currentYield = 0;
-            }
         } else {
             // 自動取得値の場合
             currentDividend = parseFloat(data.dividend) || 0;
@@ -284,7 +276,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 dividendInput.placeholder = currentDividend > 0 ? currentDividend : '--';
             }
             card.classList.remove('manual-mode');
-            currentYield = parseFloat(data.yield) || 0;
+        }
+
+        // 【ここを修正】手入力・自動取得に関わらず、常に表示上の「配当金」と「株価」から利回りを純粋に再計算する
+        let currentYield = 0;
+        if (priceVal > 0 && currentDividend > 0) {
+            currentYield = (currentDividend / priceVal) * 100;
         }
 
         // 確定した利回り表示と目標達成判定
@@ -424,13 +421,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let sumYield = 0;
         stocks.forEach(stock => {
-            if (stock.manualDividend !== null && fetchedData[stock.code]) {
+            if (fetchedData[stock.code]) {
                 const price = parseFloat(fetchedData[stock.code].price) || 0;
-                if (price > 0) {
-                    sumYield += (stock.manualDividend / price) * 100;
+                let dividend = 0;
+                
+                if (stock.manualDividend !== null) {
+                    dividend = stock.manualDividend;
+                } else {
+                    dividend = parseFloat(fetchedData[stock.code].dividend) || 0;
                 }
-            } else if (fetchedData[stock.code]) {
-                sumYield += parseFloat(fetchedData[stock.code].yield) || 0;
+
+                if (price > 0 && dividend > 0) {
+                    sumYield += (dividend / price) * 100;
+                }
             }
         });
         const avg = sumYield / count;
